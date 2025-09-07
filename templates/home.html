@@ -9,20 +9,21 @@
         <h1 class="display-4 fw-bold mb-3">Track Ethereum Addresses</h1>
         <p class="lead mb-4">Monitor balances, transactions, and get real-time alerts</p>
         {% if not user.is_authenticated %}
-            <div class="d-flex gap-3 justify-content-center">
-                <a href="{% url 'register' %}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-rocket-takeoff me-2"></i>Get Started
-                </a>
+            <div class="text-center">
                 <a href="{% url 'login' %}" class="btn btn-outline-primary btn-lg">
                     <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
                 </a>
             </div>
         {% else %}
-            <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg">
-                <i class="bi bi-speedometer2 me-2"></i>Go to Dashboard
-            </a>
+            <div class="text-center">
+                <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-speedometer2 me-2"></i>Go to Dashboard
+                </a>
+            </div>
         {% endif %}
     </div>
+
+</div>
 </div>
 
 <!-- Features Section -->

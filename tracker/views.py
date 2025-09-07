@@ -16,6 +16,12 @@ import requests
 from django.db import models
 from .forms import AddAddressForm, CreateWatchListForm
 from .forms import CustomUserCreationForm
+from django.core.paginator import Paginator
+from .models import Notification, NotificationPreference
+from .services.notification_service import NotificationService
+from django.views.decorators.http import require_http_methods
+
+
 
 
 def register(request):
@@ -171,6 +177,9 @@ from decimal import Decimal
 
 
 def update_address_balance(address):
+    """Update address balance from Etherscan API with notifications."""
+    old_balance = address.balance
+
     ETHERSCAN_API_KEY = 'HB3STU4AAVGM74E1MBKJ9M77Z6VYRMW19J'
     url = f"https://api.etherscan.io/api?module=account&action=balance&address={address.address}&tag=latest&apikey={ETHERSCAN_API_KEY}"
 
@@ -180,9 +189,16 @@ def update_address_balance(address):
     if data['status'] == '1':
         wei_balance = Decimal(data['result'])
         eth_balance = wei_balance / Decimal('1000000000000000000')  # convert wei to ETH
+
+        # Update address
         address.balance = eth_balance
         address.last_updated = timezone.now()
         address.save()
+
+        # ADD THESE LINES - Notify users of significant balance changes
+        if abs(eth_balance - old_balance) > Decimal('0.001'):  # Only notify for changes > 0.001 ETH
+            NotificationService.notify_balance_change(address, old_balance, eth_balance)
+
     else:
         raise ValueError("Failed to fetch balance from Etherscan")
 
@@ -221,7 +237,6 @@ def address_detail(request, address):
 """Add or update fetch_transactions_from_etherscan"""
 
 
-
 def fetch_transactions_from_etherscan(eth_address):
     api_key = settings.ETHERSCAN_API_KEY
     address = eth_address.address.lower()
@@ -246,18 +261,112 @@ def fetch_transactions_from_etherscan(eth_address):
         # Parse timestamp
         timestamp = timezone.make_aware(datetime.fromtimestamp(int(tx["timeStamp"])))
 
-        Transaction.objects.create(
+        # CREATE TRANSACTION - Changed from create() to get_or_create() for safety
+        tx_obj, created = Transaction.objects.get_or_create(
             hash=tx["hash"],
-            from_address=from_addr,
-            to_address=to_addr,
-            value=Decimal(tx["value"]) / Decimal(10**18),
-            gas_price=int(tx["gasPrice"]),
-            gas_used=int(tx["gasUsed"]),
-            block_number=int(tx["blockNumber"]),
-            timestamp=timestamp,
-            status=(tx["isError"] == "0"),
+            defaults={
+                'from_address': from_addr,
+                'to_address': to_addr,
+                'value': Decimal(tx["value"]) / Decimal(10 ** 18),
+                'gas_price': int(tx["gasPrice"]),
+                'gas_used': int(tx["gasUsed"]),
+                'block_number': int(tx["blockNumber"]),
+                'timestamp': timestamp,
+                'status': (tx["isError"] == "0"),
+            }
         )
 
+        # ADD THESE LINES - Send notifications for new transactions
+        if created:
+            NotificationService.notify_new_transaction(tx_obj)
+
+
+@login_required
+def notifications(request):
+    """View all notifications for the user."""
+    notifications_list = Notification.objects.filter(user=request.user)
+
+    # Pagination
+    paginator = Paginator(notifications_list, 20)
+    page_number = request.GET.get('page')
+    notifications_page = paginator.get_page(page_number)
+
+    # Mark notifications as read when viewed
+    unread_notifications = notifications_list.filter(is_read=False)
+    for notification in unread_notifications:
+        notification.mark_as_read()
+
+    context = {
+        'notifications': notifications_page,
+        'unread_count': 0,  # Now 0 since we marked them as read
+    }
+    return render(request, 'notifications/list.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def mark_notification_read(request, notification_id):
+    """Mark a specific notification as read."""
+    notification = get_object_or_404(
+        Notification,
+        id=notification_id,
+        user=request.user
+    )
+    notification.mark_as_read()
+
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def mark_all_notifications_read(request):
+    """Mark all notifications as read for the user."""
+    NotificationService.mark_all_read(request.user)
+    return JsonResponse({'success': True})
+
+
+@login_required
+def notification_preferences(request):
+    """View and update notification preferences."""
+    prefs, created = NotificationPreference.objects.get_or_create(
+        user=request.user
+    )
+
+    if request.method == 'POST':
+        # Update preferences
+        prefs.email_balance_changes = request.POST.get('email_balance_changes') == 'on'
+        prefs.email_new_transactions = request.POST.get('email_new_transactions') == 'on'
+        prefs.email_large_transactions = request.POST.get('email_large_transactions') == 'on'
+        prefs.email_alert_triggers = request.POST.get('email_alert_triggers') == 'on'
+        prefs.email_system_notifications = request.POST.get('email_system_notifications') == 'on'
+
+        prefs.inapp_balance_changes = request.POST.get('inapp_balance_changes') == 'on'
+        prefs.inapp_new_transactions = request.POST.get('inapp_new_transactions') == 'on'
+        prefs.inapp_large_transactions = request.POST.get('inapp_large_transactions') == 'on'
+        prefs.inapp_alert_triggers = request.POST.get('inapp_alert_triggers') == 'on'
+        prefs.inapp_system_notifications = request.POST.get('inapp_system_notifications') == 'on'
+
+        large_threshold = request.POST.get('large_transaction_threshold')
+        if large_threshold:
+            try:
+                prefs.large_transaction_threshold = Decimal(large_threshold)
+            except:
+                pass
+
+        prefs.email_digest_frequency = request.POST.get('email_digest_frequency', 'instant')
+        prefs.save()
+
+        messages.success(request, 'Notification preferences updated successfully!')
+        return redirect('notification_preferences')
+
+    return render(request, 'notifications/preferences.html', {'preferences': prefs})
+
+
+@login_required
+def get_notification_count(request):
+    """AJAX endpoint to get unread notification count."""
+    count = NotificationService.get_unread_count(request.user)
+    return JsonResponse({'count': count})
 
 
 from django.shortcuts import render
