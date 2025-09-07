@@ -14,6 +14,32 @@ from .models import EthereumAddress, Transaction, WatchList, Alert
 from .forms import AddAddressForm, CreateWatchListForm, CreateAlertForm
 import requests
 from django.db import models
+from .forms import AddAddressForm, CreateWatchListForm
+from .forms import CustomUserCreationForm
+
+
+def register(request):
+    """User registration view."""
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+
+            # Create a default watchlist for the new user
+            WatchList.objects.create(
+                name="My Addresses",
+                description="Default watchlist for tracked addresses",
+                user=user
+            )
+
+            # Log the user in after successful registration
+            login(request, user)
+            messages.success(request, f'Welcome {user.username}! Your account has been created successfully.')
+            return redirect('dashboard')
+    else:
+        form = CustomUserCreationForm()
+
+    return render(request, 'registration/register.html', {'form': form})
 
 
 def home(request):
