@@ -1,68 +1,148 @@
-
 {% extends 'base.html' %}
 
 {% block title %}Home - Ethereum Address Tracker{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <h2>Recent Transactions</h2>
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Hash</th>
-                        <th>From</th>
-                        <th>To</th>
-                        <th>Value (ETH)</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for tx in recent_transactions %}
-                    <tr>
-                        <td>{{ tx.hash|truncatechars:12 }}</td>
-                        <td>
-                            <a href="{% url 'address_detail' tx.from_address.address %}">
-                                {{ tx.from_address.label|default:tx.from_address.address|truncatechars:12 }}
-                            </a>
-                        </td>
-                        <td>
-                            <a href="{% url 'address_detail' tx.to_address.address %}">
-                                {{ tx.to_address.label|default:tx.to_address.address|truncatechars:12 }}
-                            </a>
-                        </td>
-                        <td>{{ tx.value }}</td>
-                        <td>{{ tx.timestamp|timesince }} ago</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center">No transactions found</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<!-- Hero Section -->
+<div class="row mb-5">
+    <div class="col-12 text-center text-white py-5">
+        <h1 class="display-4 fw-bold mb-3">Track Ethereum Addresses</h1>
+        <p class="lead mb-4">Monitor balances, transactions, and get real-time alerts</p>
+        {% if not user.is_authenticated %}
+            <div class="d-flex gap-3 justify-content-center">
+                <a href="{% url 'register' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-rocket-takeoff me-2"></i>Get Started
+                </a>
+                <a href="{% url 'login' %}" class="btn btn-outline-primary btn-lg">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                </a>
+            </div>
+        {% else %}
+            <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg">
+                <i class="bi bi-speedometer2 me-2"></i>Go to Dashboard
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="row g-4 mb-5">
+    <div class="col-md-4">
+        <div class="card text-center h-100 fade-in">
+            <div class="card-body">
+                <i class="bi bi-eye display-1 text-primary mb-3"></i>
+                <h5 class="card-title">Real-time Monitoring</h5>
+                <p class="card-text">Track Ethereum address balances and transactions in real-time using Tatum.io API</p>
+            </div>
         </div>
     </div>
     <div class="col-md-4">
-        <h2>Top Addresses</h2>
-        <div class="list-group">
-            {% for address in top_addresses %}
-            <a href="{% url 'address_detail' address.address %}" class="list-group-item list-group-item-action">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">{{ address.label|default:address.address|truncatechars:20 }}</h5>
-                    <small>{{ address.balance }} ETH</small>
+        <div class="card text-center h-100 fade-in" style="animation-delay: 0.1s;">
+            <div class="card-body">
+                <i class="bi bi-list-check display-1 text-primary mb-3"></i>
+                <h5 class="card-title">Watchlists</h5>
+                <p class="card-text">Organize your addresses into custom watchlists for better portfolio management</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center h-100 fade-in" style="animation-delay: 0.2s;">
+            <div class="card-body">
+                <i class="bi bi-bell display-1 text-primary mb-3"></i>
+                <h5 class="card-title">Smart Alerts</h5>
+                <p class="card-text">Get notified when addresses reach certain thresholds or have new transactions</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card slide-in">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>Recent Transactions
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Hash</th>
+                                <th>From</th>
+                                <th>To</th>
+                                <th>Value</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tx in recent_transactions %}
+                            <tr>
+                                <td>
+                                    <code class="crypto-address">{{ tx.hash|truncatechars:12 }}</code>
+                                </td>
+                                <td>
+                                    <a href="{% url 'address_detail' tx.from_address.address %}" class="text-decoration-none">
+                                        {{ tx.from_address.label|default:tx.from_address.address|truncatechars:12 }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <a href="{% url 'address_detail' tx.to_address.address %}" class="text-decoration-none">
+                                        {{ tx.to_address.label|default:tx.to_address.address|truncatechars:12 }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">{{ tx.value }} ETH</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ tx.timestamp|timesince }} ago</small>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4">
+                                    <i class="bi bi-inbox display-6 text-muted"></i>
+                                    <p class="text-muted mt-2">No transactions found</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                <p class="mb-1">{{ address.tx_count }} transactions</p>
-            </a>
-            {% empty %}
-            <div class="list-group-item">No addresses tracked yet</div>
-            {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card slide-in" style="animation-delay: 0.1s;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-star me-2"></i>Top Addresses
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for address in top_addresses %}
+                <div class="d-flex justify-content-between align-items-center border-bottom py-3">
+                    <div>
+                        <a href="{% url 'address_detail' address.address %}" class="text-decoration-none fw-semibold">
+                            {{ address.label|default:address.address|truncatechars:20 }}
+                        </a>
+                        <div class="small text-muted">{{ address.tx_count }} transactions</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold">{{ address.balance }} ETH</div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="bi bi-wallet2 display-6 text-muted"></i>
+                    <p class="text-muted mt-2">No addresses tracked yet</p>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
-
-
-
-
